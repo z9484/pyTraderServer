@@ -75,19 +75,30 @@ class Server(object):
 
     def transaction(self, base, commodity, amt):
         commodity += "_cur"
-        print '''update bases SET {0} = {0} + {1} WHERE id={2}'''.format(commodity, amt, base)
-        self.curs.execute('''update bases SET {0} = {0} + {1} WHERE id={2}'''.format(commodity, amt, base))
+        self.curs.execute("UPDATE bases SET {0} = {0} + {1} WHERE id={2}".format(commodity, amt, base))
         self.conn.commit()
   
     def displaytable(self):
-        self.curs.execute("select * from bases")
+        self.curs.execute("SELECT * FROM bases")
         for row in self.curs:
             print row
 
+    def getBaseData(self, args):
+        tt = ""
+        for i in xrange(len(args)):
+            tt += " id = " + str(args[i])
+            if i < len(args) - 1:
+                tt += " OR"
+                
+        self.curs.execute("SELECT * FROM bases WHERE" + tt)
+        return [row for row in self.curs]
+    
+        
 if __name__ == "__main__":
     cc = Server()
     # cc.create()
-    cc.displaytable()
-    cc.transaction(1, "food", 5)
-    cc.displaytable()
+    # cc.displaytable()
+    # cc.transaction(1, "food", 5)
+    # cc.displaytable()
+    # print cc.getBaseData([1, 3, 22])
     
