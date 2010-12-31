@@ -4,8 +4,21 @@ from sqlite3 import *
 import cPickle as pickle
 import threading
 
-someList = [1, 2, 7, 9, 0]
-pickledList = pickle.dumps(someList)
+
+class ConnectionThread (threading.Thread):
+    def run(self):
+        HOST = ''                 
+        PORT = 50007         
+        CLIENTS = 5     
+        server = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
+        server.bind ((HOST, PORT))
+        server.listen(CLIENTS)
+
+        while 1:
+            channel, addr = server.accept()
+            ClientThread(channel, addr).start()
+            
+            
 
 class ClientThread (threading.Thread):
     def __init__(self, channel, addr):
@@ -14,27 +27,31 @@ class ClientThread (threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
+        self.db = Server()
         print 'Received connection:', self.addr[0]
-
-        db = Server()
-            data = conn.recv(1024)
-            if data:
-                d = eval(data)
-                print db.getBaseData(d)
-            if not data: break
-            conn.send("ACPT")
-            conn.close()        
-
-
-        self.channel.send(pickledList)
+        self.startClient()
         while 1:
             packet = self.channel.recv(1024)
             if not packet: break
-            print packet            
+            # print "Recieving Packet", packet
+            self.handle(packet)            
         self.channel.close()
         print 'Closed connection:', self.addr[0]
 
-                    
+    def handle(self, data):
+        d = pickle.loads(data)
+        print self.db.getBaseData(d)
+        
+    def startClient(self):
+        outpostData = pickle.dumps(self.db.getTable())
+        import sys
+        size = pickle.dumps(sys.getsizeof(outpostData))
+        
+        self.channel.send(size)
+        packet = self.channel.recv(25)
+        print "yes"
+        self.channel.send(outpostData)
+        
 
 class Server(object):
     def __init__(self):
@@ -42,6 +59,7 @@ class Server(object):
         self.curs = self.conn.cursor()
         
     def run(self):
+        
         while (True):
             raw = raw_input(">").strip()
             
@@ -128,21 +146,11 @@ class Server(object):
         self.curs.execute("SELECT * FROM bases WHERE" + tt)
         return [row for row in self.curs]
 
+    def getTable(self):
+        self.curs.execute("SELECT * FROM bases")
+        return [row for row in self.curs]
 
-
-    def serve(self):
-        HOST = ''                 
-        PORT = 50007         
-        CLIENTS = 5     
-        server = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
-        server.bind ((HOST, PORT))
-        server.listen(CLIENTS)
-
-        while 1:
-            channel, addr = server.accept()
-            ClientThread (channel, addr).start()
-
-            
+        
 if __name__ == "__main__":
     cc = Server()
     
@@ -151,11 +159,9 @@ if __name__ == "__main__":
     # cc.transaction(1, "food", 5)
     # cc.displaytable()
     # print cc.getBaseData([1, 3, 22])
-    
-    
-    
-    
-    cc.serve()
+    # cc.run()
+    ConnectionThread().start()
+    # print cc.getTable()
     
     
     
