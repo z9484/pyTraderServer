@@ -1,4 +1,5 @@
 import re
+import socket
 from sqlite3 import *
 
 class Server(object):
@@ -92,13 +93,50 @@ class Server(object):
                 
         self.curs.execute("SELECT * FROM bases WHERE" + tt)
         return [row for row in self.curs]
-    
+
+
+
+    def serve(self):
+        db = Server()
+        
+        HOST = ''                 # Symbolic name meaning the local host
+        PORT = 50007              # Arbitrary non-privileged port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((HOST, PORT))
+        s.listen(1)
+        conn, addr = s.accept()
+        print 'Connected by', addr
+        while 1:
+            data = conn.recv(1024)
+            if data:
+                d = eval(data)
+                print db.getBaseData(d)
+            if not data: break
+            conn.send("ACPT")
+        conn.close()        
         
 if __name__ == "__main__":
     cc = Server()
+    
     # cc.create()
     # cc.displaytable()
     # cc.transaction(1, "food", 5)
     # cc.displaytable()
     # print cc.getBaseData([1, 3, 22])
+    
+    
+    
+    
+    cc.serve()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
