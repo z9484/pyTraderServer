@@ -1,6 +1,40 @@
 import re
 import socket
 from sqlite3 import *
+import cPickle as pickle
+import threading
+
+someList = [1, 2, 7, 9, 0]
+pickledList = pickle.dumps(someList)
+
+class ClientThread (threading.Thread):
+    def __init__(self, channel, addr):
+        self.channel = channel
+        self.addr = addr
+        threading.Thread.__init__(self)
+
+    def run(self):
+        print 'Received connection:', self.addr[0]
+
+        db = Server()
+            data = conn.recv(1024)
+            if data:
+                d = eval(data)
+                print db.getBaseData(d)
+            if not data: break
+            conn.send("ACPT")
+            conn.close()        
+
+
+        self.channel.send(pickledList)
+        while 1:
+            packet = self.channel.recv(1024)
+            if not packet: break
+            print packet            
+        self.channel.close()
+        print 'Closed connection:', self.addr[0]
+
+                    
 
 class Server(object):
     def __init__(self):
@@ -97,24 +131,18 @@ class Server(object):
 
 
     def serve(self):
-        db = Server()
-        
-        HOST = ''                 # Symbolic name meaning the local host
-        PORT = 50007              # Arbitrary non-privileged port
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((HOST, PORT))
-        s.listen(1)
-        conn, addr = s.accept()
-        print 'Connected by', addr
+        HOST = ''                 
+        PORT = 50007         
+        CLIENTS = 5     
+        server = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
+        server.bind ((HOST, PORT))
+        server.listen(CLIENTS)
+
         while 1:
-            data = conn.recv(1024)
-            if data:
-                d = eval(data)
-                print db.getBaseData(d)
-            if not data: break
-            conn.send("ACPT")
-        conn.close()        
-        
+            channel, addr = server.accept()
+            ClientThread (channel, addr).start()
+
+            
 if __name__ == "__main__":
     cc = Server()
     
