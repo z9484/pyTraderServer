@@ -3,7 +3,7 @@ import socket
 from sqlite3 import *
 import cPickle as pickle
 import threading
-
+from character import *
 
 class ConnectionThread (threading.Thread):
     def run(self):
@@ -51,6 +51,9 @@ class ClientThread (threading.Thread):
         packet = self.channel.recv(25)
         print "yes"
         self.channel.send(outpostData)
+        tt = Character("Test")
+        self.channel.send(pickle.dumps(tt))
+
         
 
 class Server(object):
