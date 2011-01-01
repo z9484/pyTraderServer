@@ -21,7 +21,8 @@ if packet == "1":
     player = pickle.loads(client.recv(1024))
     print player
     
-    client.send(pickle.dumps((1,3)))
+    client.send(pickle.dumps( (("m", 4,5), ("b", (1,3)) ) ))
+    # client.send(pickle.dumps( (("b", (1,3)),) ))
 
 # for x in xrange(10):
    # client.send('Hey. ' + str (x) + '\n')

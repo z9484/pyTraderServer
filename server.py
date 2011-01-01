@@ -5,8 +5,9 @@ import cPickle as pickle
 import threading
 from character import *
 
-lock = threading.Lock()
+playersLock = threading.Lock()
 players = [Character("1"), Character("2")]
+# shouldQuit = False
 
 class ConnectionThread (threading.Thread):
     def run(self):
@@ -27,6 +28,7 @@ class ClientThread (threading.Thread):
     def __init__(self, channel, addr):
         self.channel = channel
         self.addr = addr
+        # self.playerIndex = -1
         threading.Thread.__init__(self)
 
     def run(self):
@@ -37,14 +39,27 @@ class ClientThread (threading.Thread):
             packet = self.channel.recv(1024)
             if not packet: break
             # print "Recieving Packet", packet
-            self.handle(packet)            
+            self.recieve(packet)            
         self.channel.close()
         print 'Closed connection:', self.addr[0]
 
-    def handle(self, data):
-        d = pickle.loads(data)
-        print self.db.getBaseData(d)
+    def recieve(self, data):
+        cmds = pickle.loads(data)
+        for cmd in cmds:
+            print cmd
+            self.handle(cmd)
         
+    def handle(self, cmd):
+        print "parsing command:", cmd
+        if cmd[0] == 'm':
+            playersLock.acquire()
+            players[self.playerIndex].posX = cmd[1]
+            players[self.playerIndex].posY = cmd[2]
+            print "updated player {0}'s coordinates to {1},{2}".format(players[self.playerIndex].name, players[self.playerIndex].posX, players[self.playerIndex].posY)
+            playersLock.release()
+        elif cmd[0] == 'b':
+            print self.db.getBaseData(cmd[1])
+
     def startClient(self):
         outpostData = pickle.dumps(self.db.getTable())
         import sys
@@ -57,14 +72,15 @@ class ClientThread (threading.Thread):
         auth = pickle.loads(self.channel.recv(1024))
         print auth
         found = False
-        for player in players:
-            if auth[0] == player.name and auth[1] == player.password:
+        for player in xrange(len(players)):
+            if auth[0] == players[player].name and auth[1] == players[player].password:
                 # print "found"
-                lock.acquire()
+                playersLock.acquire()
                 self.channel.send("1")
-                self.channel.send(pickle.dumps(player))
+                self.channel.send(pickle.dumps(players[player]))
                 found = True
-                lock.release()
+                playersLock.release()
+                self.playerIndex = player
         
         # if found:
             # self.channel.send(pickle.dumps())
@@ -76,14 +92,7 @@ class Server(object):
         self.conn = connect('data.db')
         self.curs = self.conn.cursor()
         
-    def run(self):
-        
-        while (True):
-            raw = raw_input(">").strip()
-            
-            shouldQuit = re.search(r"q|quit|exit", raw, re.I)
-            if shouldQuit:
-                break
+   
 
     def create(self):
        
@@ -168,9 +177,16 @@ class Server(object):
         self.curs.execute("SELECT * FROM bases")
         return [row for row in self.curs]
 
-        
+def runServer(self):
+    ConnectionThread().start()
+    while (True):
+        raw = raw_input(">").strip()
+        shouldQuit = re.search(r"q|quit|exit", raw, re.I)
+        if shouldQuit:
+            break
+            
 if __name__ == "__main__":
-    cc = Server()
+    # cc = Server()
     
     # cc.create()
     # cc.displaytable()
@@ -178,9 +194,9 @@ if __name__ == "__main__":
     # cc.displaytable()
     # print cc.getBaseData([1, 3, 22])
     # cc.run()
-    ConnectionThread().start()
-    # print cc.getTable()
     
+    # print cc.getTable()
+    ConnectionThread().start()
     
     
     
