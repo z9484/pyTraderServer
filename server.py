@@ -5,6 +5,9 @@ import cPickle as pickle
 import threading
 from character import *
 
+lock = threading.Lock()
+players = [Character("1"), Character("2")]
+
 class ConnectionThread (threading.Thread):
     def run(self):
         HOST = ''                 
@@ -51,8 +54,20 @@ class ClientThread (threading.Thread):
         packet = self.channel.recv(25)
         print "yes"
         self.channel.send(outpostData)
-        tt = Character("Test")
-        self.channel.send(pickle.dumps(tt))
+        auth = pickle.loads(self.channel.recv(1024))
+        print auth
+        found = False
+        for player in players:
+            if auth[0] == player.name and auth[1] == player.password:
+                # print "found"
+                lock.acquire()
+                self.channel.send("1")
+                self.channel.send(pickle.dumps(player))
+                found = True
+                lock.release()
+        
+        # if found:
+            # self.channel.send(pickle.dumps())
 
         
 
