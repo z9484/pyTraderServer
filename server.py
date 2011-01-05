@@ -18,11 +18,11 @@ class ConnectionThread (threading.Thread):
         server = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
         server.bind ((HOST, PORT))
         server.listen(CLIENTS)
-
+        
+        
         while 1:
             channel, addr = server.accept()
             ClientThread(channel, addr).start()
-            
             
 
 class ClientThread (threading.Thread):
@@ -58,8 +58,14 @@ class ClientThread (threading.Thread):
             players[self.playerIndex].posY = cmd[2]
             print "updated player {0}'s coordinates to {1},{2}".format(players[self.playerIndex].name, players[self.playerIndex].posX, players[self.playerIndex].posY)
             playersLock.release()
+            print   players[self.playerIndex].name, players[self.playerIndex].posX,  players[self.playerIndex].posY
+            print players[self.playerIndex].name, players[self.playerIndex].posX, players[self.playerIndex].posY
         elif cmd[0] == 'b':
-            print self.db.getBaseData(cmd[1])
+            exec("players[self.playerIndex]." + cmd[2] + " += int(cmd[3])")
+            players[self.playerIndex].credits -= cmd[4]
+            self.db.transaction(cmd[1], cmd[2], "-"+cmd[3])
+            # print players[self.playerIndex].food, players[self.playerIndex].credits
+            # print self.db.getBaseData(cmd[1])
         # elif cmd[0] == 's:'
             
             
@@ -97,8 +103,6 @@ class Server(object):
         self.conn = connect('data.db')
         self.curs = self.conn.cursor()
         
-   
-
     def create(self):
        
         self.curs.execute('''create table bases
