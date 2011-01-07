@@ -1,16 +1,25 @@
-import re
-import socket
+import re, sys, socket, time, threading
 from sqlite3 import *
 import cPickle as pickle
-import threading
 from character import *
-import sys
         
 playersLock = threading.Lock()
-players = [Character("1"), Character("2")]
+players = []
 # shouldQuit = False
 
-class ConnectionThread (threading.Thread):
+      
+class SleeperThread(threading.Thread):
+    def run(self):
+        self.db = Server()
+        while 1:
+            time.sleep(900) #every 15 minutes do something
+            self.task()
+            
+    def task(self):
+        # print self.db.getTable()
+        pass
+
+class ConnectionThread(threading.Thread):
     def run(self):
         HOST = ''                 
         PORT = 50007         
@@ -19,13 +28,13 @@ class ConnectionThread (threading.Thread):
         server.bind ((HOST, PORT))
         server.listen(CLIENTS)
         
-        
+        # SleeperThread().start()
         while 1:
             channel, addr = server.accept()
             ClientThread(channel, addr).start()
             
 
-class ClientThread (threading.Thread):
+class ClientThread(threading.Thread):
     def __init__(self, channel, addr):
         self.channel = channel
         self.addr = addr
@@ -42,6 +51,7 @@ class ClientThread (threading.Thread):
             # print "Recieving Packet", packet
             self.recieve(packet)            
         self.channel.close()
+        self.savePlayer()
         print 'Closed connection:', self.addr[0]
 
     def recieve(self, data):
@@ -61,28 +71,48 @@ class ClientThread (threading.Thread):
             print   players[self.playerIndex].name, players[self.playerIndex].posX,  players[self.playerIndex].posY
             print players[self.playerIndex].name, players[self.playerIndex].posX, players[self.playerIndex].posY
         elif cmd[0] == 'b':
-            exec("players[self.playerIndex]." + cmd[2] + " += int(cmd[3])")
+            exec("players[self.playerIndex]." + cmd[2] + " += cmd[3]")
             players[self.playerIndex].credits -= cmd[4]
-            self.db.transaction(cmd[1], cmd[2], "-"+cmd[3])
+            self.db.transaction(cmd[1], cmd[2], -cmd[3])
+        elif cmd[0] == 's':
+            exec("players[self.playerIndex]." + cmd[2] + " -= cmd[3]")
+            players[self.playerIndex].credits += cmd[4]
+            self.db.transaction(cmd[1], cmd[2], cmd[3])
             # print players[self.playerIndex].food, players[self.playerIndex].credits
-            # print self.db.getBaseData(cmd[1])
-        # elif cmd[0] == 's:'
+        elif cmd[0] == 'o':
+            data = self.db.getBaseData(cmd[1])
+            self.channel.send(pickle.dumps((data[0][5], data[0][7], data[0][9])))
             
-            
-
     def startClient(self):
         auth = pickle.loads(self.channel.recv(1024))
         print auth
         found = False
+        paswd = False
+
+        playersLock.acquire()
         for player in xrange(len(players)):
-            if auth[0] == players[player].name and auth[1] == players[player].password:
-                # print "found"
-                playersLock.acquire()
-                self.channel.send("1")
-                self.channel.send(pickle.dumps(players[player]))
+            if auth[0] == players[player].name:
                 found = True
-                playersLock.release()
-                self.playerIndex = player
+                if auth[1] == players[player].password:
+                    paswd = True
+                    self.channel.send("1")
+                    self.channel.send(pickle.dumps(players[player]))
+                    found = True
+                    self.playerIndex = player
+        
+        if not found:
+            players.append(Character(auth[0], auth[1]))
+            self.channel.send("1")
+            self.channel.send(pickle.dumps(players[-1]))
+            self.playerIndex = len(players) - 1
+            print "New player created: ", players[-1].name
+            self.db.createPlayer(players[-1])
+        playersLock.release()
+            
+
+        if found and not paswd:
+            self.channel.send("0")
+        
         
         outpostData = pickle.dumps(self.db.getTable())
         size = pickle.dumps(sys.getsizeof(outpostData))
@@ -93,10 +123,14 @@ class ClientThread (threading.Thread):
         self.channel.send(outpostData)
         
         
-        # if found:
+        
             # self.channel.send(pickle.dumps())
 
-        
+    def savePlayer(self):
+        pass
+        # playersLock.acquire()
+        # players[self.playerIndex].name
+        # playersLock.release()
 
 class Server(object):
     def __init__(self):
@@ -162,6 +196,15 @@ class Server(object):
             (NULL,44,43,2,3400,1700,9000,4500,4500,2250)''')
         self.conn.commit()
 
+        self.curs.execute('''create table players
+        (id integer primary key, name text, password text, x integer, y integer, credits integer, food integer, mineral integer, equipment integer, maxcargo integer)''')
+        self.conn.commit()
+        
+    def createPlayer(self, player):
+        print "insert into players values (NULL, {0}, {1}, 2, 2, 100, 0, 0, 0, 25)".format(player.name, player.password)
+        self.curs.execute('''insert into players values (NULL, "{0}", "{1}", 2, 2, 100, 0, 0, 0, 25)'''.format(player.name, player.password))
+        self.conn.commit()
+    
     def transaction(self, base, commodity, amt):
         commodity += "_cur"
         self.curs.execute("UPDATE bases SET {0} = {0} + {1} WHERE id={2}".format(commodity, amt, base))
@@ -208,6 +251,17 @@ if __name__ == "__main__":
     
     ConnectionThread().start()
     
+    # hasRan = False
+    
+    # if not hasRan:
+        # curtime = time.gmtime(time.time())
+        # print curtime.tm_hour, curtime.tm_min
+        # if curtime.tm_min == 20:
+            
+        # hasRan = True
+    
+
+    # raw_input()
     
     
     
