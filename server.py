@@ -34,6 +34,8 @@ class ConnectionThread(threading.Thread):
             channel, addr = server.accept()
             ClientThread(channel, addr).start()
             
+        s.close()
+        
     def load(self):
         db = Server()
         data = db.getTable("players")
@@ -275,7 +277,7 @@ class Server(object):
         self.curs.execute("SELECT * FROM {0}".format(table))
         return [row for row in self.curs]
 
-def runServer(self):
+def runServer():
     ConnectionThread().start()
     while (True):
         raw = raw_input(">").strip()
