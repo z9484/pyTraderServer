@@ -24,16 +24,30 @@ class ConnectionThread(threading.Thread):
         HOST = ''                 
         PORT = 50007         
         CLIENTS = 5     
+        
+        self.load()
+        # SleeperThread().start()
         server = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
         server.bind ((HOST, PORT))
         server.listen(CLIENTS)
-        
-        # SleeperThread().start()
         while 1:
             channel, addr = server.accept()
             ClientThread(channel, addr).start()
             
-
+    def load(self):
+        db = Server()
+        data = db.getTable("players")
+        for row in data:
+            players.append(Character(row[1], row[2]))
+            players[-1].posX = row[3]
+            players[-1].posY = row[4]
+            players[-1].credits = row[5]
+            players[-1].food = row[6]
+            players[-1].mineral = row[7]
+            players[-1].equipment = row[8]
+            players[-1].maxcargo = row[9]
+            
+        
 class ClientThread(threading.Thread):
     def __init__(self, channel, addr):
         self.channel = channel
@@ -82,7 +96,12 @@ class ClientThread(threading.Thread):
         elif cmd[0] == 'o':
             data = self.db.getBaseData(cmd[1])
             self.channel.send(pickle.dumps((data[0][5], data[0][7], data[0][9])))
-            
+        elif cmd[0] == 'sv':
+            playersLock.acquire()
+            self.db.savePlayer(players[self.playerIndex])
+            # players.pop(self.playerIndex) 
+            playersLock.release()
+                        
     def startClient(self):
         auth = pickle.loads(self.channel.recv(1024))
         print auth
@@ -114,7 +133,7 @@ class ClientThread(threading.Thread):
             self.channel.send("0")
         
         
-        outpostData = pickle.dumps(self.db.getTable())
+        outpostData = pickle.dumps(self.db.getTable("bases"))
         size = pickle.dumps(sys.getsizeof(outpostData))
         self.channel.send(size)
 
@@ -197,19 +216,46 @@ class Server(object):
         self.conn.commit()
 
         self.curs.execute('''create table players
-        (id integer primary key, name text, password text, x integer, y integer, credits integer, food integer, mineral integer, equipment integer, maxcargo integer)''')
+        (id integer primary key, name text UNIQUE, password text, x integer, y integer, credits integer, food integer, mineral integer, equipment integer, maxcargo integer)''')
         self.conn.commit()
         
     def createPlayer(self, player):
         print "insert into players values (NULL, {0}, {1}, 2, 2, 100, 0, 0, 0, 25)".format(player.name, player.password)
         self.curs.execute('''insert into players values (NULL, "{0}", "{1}", 2, 2, 100, 0, 0, 0, 25)'''.format(player.name, player.password))
         self.conn.commit()
-    
+
+    def savePlayer(self, player):
+        self.curs.execute('''UPDATE players SET  x = {1}, y = {2}, credits = {3}, food = {4}, mineral = {5}, equipment = {6}, maxcargo = {7} WHERE name = "{0}"'''.format(player.name, player.posX, player.posY, player.credits, player.food, player.mineral, player.equipment, player.maxcargo))
+        self.conn.commit()
+           
     def transaction(self, base, commodity, amt):
         commodity += "_cur"
         self.curs.execute("UPDATE bases SET {0} = {0} + {1} WHERE id={2}".format(commodity, amt, base))
         self.conn.commit()
   
+    def dailyAdj(self):
+        pass
+        '''
+        if self.type == "Farm":
+        self.calc(self.food, 0.2)
+        self.calc(self.mineral, -0.05)
+        self.calc(self.equipment, -0.1)
+        elif self.type == "Mine":
+        self.calc(self.food, -0.1)
+        self.calc(self.mineral, 0.2)
+        self.calc(self.equipment, -0.1)
+        elif self.type == "Factory":
+        self.calc(self.food, -0.1)
+        self.calc(self.mineral, -0.2)
+        self.calc(self.equipment, 0.2)
+        elif self.type == "City":
+        self.calc(self.food, -0.125)
+        self.calc(self.mineral, -0.125)
+        self.calc(self.equipment, -0.125)
+        '''
+           
+
+    
     def displaytable(self):
         self.curs.execute("SELECT * FROM bases")
         for row in self.curs:
@@ -225,8 +271,8 @@ class Server(object):
         self.curs.execute("SELECT * FROM bases WHERE" + tt)
         return [row for row in self.curs]
 
-    def getTable(self):
-        self.curs.execute("SELECT * FROM bases")
+    def getTable(self, table):
+        self.curs.execute("SELECT * FROM {0}".format(table))
         return [row for row in self.curs]
 
 def runServer(self):
@@ -238,9 +284,9 @@ def runServer(self):
             break
             
 if __name__ == "__main__":
-    # cc = Server()
+    #cc = Server()
     
-    # cc.create()
+    #cc.create()
     # cc.displaytable()
     # cc.transaction(1, "food", 5)
     # cc.displaytable()
