@@ -6,7 +6,8 @@ from character import *
 playersLock = threading.Lock()
 players = []
 # shouldQuit = False
-
+NUMCITIES = 25
+INTERVAL = 24 # once every hour
       
 class SleeperThread(threading.Thread):
     def run(self):
@@ -236,25 +237,30 @@ class Server(object):
         self.conn.commit()
   
     def dailyAdj(self):
-        pass
-        '''
-        if self.type == "Farm":
-        self.calc(self.food, 0.2)
-        self.calc(self.mineral, -0.05)
-        self.calc(self.equipment, -0.1)
-        elif self.type == "Mine":
-        self.calc(self.food, -0.1)
-        self.calc(self.mineral, 0.2)
-        self.calc(self.equipment, -0.1)
-        elif self.type == "Factory":
-        self.calc(self.food, -0.1)
-        self.calc(self.mineral, -0.2)
-        self.calc(self.equipment, 0.2)
-        elif self.type == "City":
-        self.calc(self.food, -0.125)
-        self.calc(self.mineral, -0.125)
-        self.calc(self.equipment, -0.125)
-        '''
+        for base in xrange(1,NUMCITIES):
+            self.curs.execute("SELECT * FROM bases WHERE id = {0}".format(base))
+            data = self.curs.fetchone()
+            
+            if data[3] == 1:
+                frate = 0.2
+                mrate = -0.05
+                erate = -0.1
+            elif data[3] == 2:
+                frate = -0.1
+                mrate = 0.2
+                erate = -0.1
+            elif data[3] == 3:
+                frate = -0.1
+                mrate = -0.2
+                erate = 0.2
+            elif data[3] == 4:
+                frate = -0.125
+                mrate = -0.125
+                erate = -0.125
+
+            #print "UPDATE bases SET food_cur = food_cur +((food_cap * {0})/{4}), mineral_cur = mineral_cur + ((mineral_cap * {1})/{4}), equip_cur = equip_cur + ((equip_cap * {2})/{4}) WHERE id={3}".format(frate, mrate, erate, base, interval)
+        self.curs.execute("UPDATE bases SET food_cur = food_cur +((food_cap * {0})/{4}), mineral_cur = mineral_cur + ((mineral_cap * {1})/{4}), equip_cur = equip_cur + ((equip_cap * {2})/{4}) WHERE id={3}".format(frate, mrate, erate, base, INTERVAL))
+        self.conn.commit()
            
 
     
@@ -287,6 +293,8 @@ def runServer():
             
 if __name__ == "__main__":
     #cc = Server()
+    #cc.dailyAdj()
+
     
     #cc.create()
     # cc.displaytable()
